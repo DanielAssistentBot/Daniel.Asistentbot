@@ -1,29 +1,38 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-import os
 from flask import Flask, request
+import asyncio
+import os
 
 TOKEN = "7832991702:AAFuyiAe9_twJk_MncmRNo2mU3O6qTpEWQM"
-BOT_USERNAME = "DanielAsistentBot"  # без @
-WEBHOOK_URL = f"https://daniel-asistentbot-1.onrender.com/webhook"
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"https://daniel-asistentbot-1.onrender.com{WEBHOOK_PATH}"
 
-app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", lambda update, ctx: update.message.reply_text("Привет! Я твой ассистент.")))
+# Создание Telegram-приложения
+application = ApplicationBuilder().token(TOKEN).build()
+application.add_handler(CommandHandler("start", lambda update, context: update.message.reply_text("Привет! Я твой ассистент.")))
 
-# Запускаем Flask-сервер
+# Flask-приложение
 flask_app = Flask(__name__)
 
-@flask_app.route('/webhook', methods=['POST'])
+@flask_app.route(WEBHOOK_PATH, methods=["POST"])
 async def webhook():
-    await app.update_queue.put(Update.de_json(request.json, app.bot))
-    return "OK"
+    update = Update.de_json(request.json, application.bot)
+    await application.update_queue.put(update)
+    return "ok"
 
-@flask_app.route('/', methods=['GET'])
-def healthcheck():
-    return "Bot is running"
+@flask_app.route("/", methods=["GET"])
+def index():
+    return "Бот работает!"
 
-if __name__ == '__main__':
-    import asyncio
-    asyncio.run(app.initialize())
-    await app.bot.set_webhook(WEBHOOK_URL)
+async def main():
+    await application.initialize()
+    await application.bot.set_webhook(url=WEBHOOK_URL)
+    await application.start()
+
+if __name__ == "__main__":
+    # Запуск Telegram части
+    asyncio.run(main())
+    
+    # Запуск Flask-сервера
     flask_app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
